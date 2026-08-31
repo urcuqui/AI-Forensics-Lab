@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}AI Forensics Lab — {{ case.case_id }}{% endblock %}
+{% block body %}
+<div id="app" data-csrf="{{ csrf_token }}" data-case-id="{{ case.case_id }}">
+
+  <div class="sim-banner">EDUCATIONAL SIMULATION — FICTIONAL EVIDENCE</div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <div>
+        <h1>AI Forensics Lab</h1>
+        <p class="subtitle">Forensic analysis of AI-assisted systems</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="btn-guided" class="btn btn-outline">Guided Investigation</button>
+      <button id="btn-presentation" class="btn btn-outline">Presentation Mode</button>
+      <span id="ollama-indicator" class="status-pill status-unknown" title="Ollama connection status">Ollama: checking…</span>
+    </div>
+  </header>
+
+  <section class="case-meta-bar">
+    <div class="meta-item"><span class="meta-label">Case ID</span><span class="meta-value">{{ case.case_id }}</span></div>
+    <div class="meta-item"><span class="meta-label">Codename</span><span class="meta-value">{{ case.codename }}</span></div>
+    <div class="meta-item"><span class="meta-label">Status</span><span class="meta-value status-badge">{{ case.status }}</span></div>
+    <div class="meta-item"><span class="meta-label">Date Opened</span><span class="meta-value">{{ case.date_opened }}</span></div>
+    <div class="meta-item"><span class="meta-label">Investigator</span><span class="meta-value">{{ case.investigator }}</span></div>
+    <div class="meta-item"><span class="meta-label">AI System</span><span class="meta-value">{{ case.ai_system }}</span></div>
+    <div class="meta-item"><span class="meta-label">Model</span><span class="meta-value">{{ case.model }}</span></div>
+    <div class="meta-item"><span class="meta-label">Classification</span><span class="meta-value">{{ case.incident_classification }}</span></div>
+    <div class="meta-item"><span class="meta-label">Evidence Count</span><span class="meta-value">{{ evidence_count }}</span></div>
+  </section>
+
+  <nav class="stage-nav" id="stage-nav">
+    <button class="stage-tab active" data-stage="overview"><span class="stage-num">1</span>Case Overview</button>
+    <button class="stage-tab" data-stage="evidence"><span class="stage-num">2</span>Evidence</button>
+    <button class="stage-tab" data-stage="trace"><span class="stage-num">3</span>AI Interaction Trace</button>
+    <button class="stage-tab" data-stage="timeline"><span class="stage-num">4</span>Timeline</button>
+    <button class="stage-tab" data-stage="findings"><span class="stage-num">5</span>Findings</button>
+    <button class="stage-tab" data-stage="report"><span class="stage-num">6</span>Forensic Report</button>
+  </nav>
+
+  <main id="stage-container">
+
+    <!-- STAGE 1: CASE OVERVIEW -->
+    <section class="stage" id="stage-overview" data-stage-panel="overview">
+      <div class="panel">
+        <h2>Incident Summary</h2>
+        <p>{{ incident_summary.narrative }}</p>
+
+        <div class="callout callout-ai">
+          <div class="callout-label">AI-Generated Conclusion (under examination)</div>
+          <blockquote>&ldquo;{{ incident_summary.ai_conclusion }}&rdquo;</blockquote>
+        </div>
+
+        <p>{{ incident_summary.trigger }}</p>
+
+        <div class="callout callout-objective">
+          <div class="callout-label">Forensic Objective</div>
+          <p>{{ incident_summary.objective }}</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Observation ≠ Interpretation ≠ Conclusion</h2>
+        <div class="oic-grid">
+          <div class="oic-card oic-observation">
+            <h3>Observation</h3>
+            <p>What the evidence directly shows.</p>
+          </div>
+          <div class="oic-card oic-interpretation">
+            <h3>Interpretation</h3>
+            <p>What the examiner believes it may mean.</p>
+          </div>
+          <div class="oic-card oic-conclusion">
+            <h3>Conclusion</h3>
+            <p>What can reasonably be supported after correlating evidence.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>AI Evidence Chain of Custody</h2>
+        <div id="custody-flow" class="flow-row"></div>
+        <p class="muted">AI investigations may require preserving more than traditional files: user
+          prompts, system prompts, model configuration and version, context window contents, retrieved
+          documents, embeddings / vector search results, tool calls and outputs, memory, application logs,
+          and model responses.</p>
+        <div id="custody-table-wrap" class="table-wrap"></div>
+      </div>
+
+      <div class="panel">
+        <h2>AI Forensic Evidence Map</h2>
+        <div id="evidence-map" class="evidence-map"></div>
+      </div>
+    </section>
+
+    <!-- STAGE 2: EVIDENCE -->
+    <section class="stage hidden" id="stage-evidence" data-stage-panel="evidence">
+      <div class="panel">
+        <div class="panel-header-row">
+          <h2>Evidence Explorer</h2>
+          <span class="muted" id="evidence-count-label"></span>
+        </div>
+        <div id="evidence-grid" class="evidence-grid"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Suspicious Instruction Analysis <span class="tag-soft">Prompt Injection Detector</span></h2>
+        <p class="muted">Select a retrieved document to scan for language patterns that may attempt to
+          manipulate an AI system. Detection is heuristic and AI-assisted — it is never presented as proof.</p>
+        <div class="row gap">
+          <select id="injection-evidence-select"></select>
+          <button id="btn-run-injection-scan" class="btn btn-primary">Analyse Document</button>
+        </div>
+        <div id="injection-results" class="injection-results"></div>
+      </div>
+    </section>
+
+    <!-- STAGE 3: AI INTERACTION TRACE -->
+    <section class="stage hidden" id="stage-trace" data-stage-panel="trace">
+      <div class="panel">
+        <div class="panel-header-row">
+          <h2>AI Interaction Trace</h2>
+          <button id="btn-trust-boundaries" class="btn btn-outline">Show Trust Boundaries</button>
+        </div>
+        <p class="muted">Click any node to inspect the evidence associated with that step.</p>
+        <div id="trace-diagram" class="trace-diagram"></div>
+        <div id="trust-boundary-panel" class="trust-boundary-panel hidden"></div>
+      </div>
+      <div class="panel" id="trace-detail-panel">
+        <h2>Node Detail</h2>
+        <p class="muted">Select a node above to view its evidence.</p>
+        <div id="trace-detail-content"></div>
+      </div>
+    </section>
+
+    <!-- STAGE 4: TIMELINE -->
+    <section class="stage hidden" id="stage-timeline" data-stage-panel="timeline">
+      <div class="panel">
+        <div class="panel-header-row">
+          <h2>Timeline Reconstruction</h2>
+        </div>
+        <div id="timeline-filters" class="row gap wrap"></div>
+        <div id="timeline-list" class="timeline-list"></div>
+      </div>
+    </section>
+
+    <!-- STAGE 5: FINDINGS (includes AI-assisted analysis + findings board + root cause) -->
+    <section class="stage hidden" id="stage-findings" data-stage-panel="findings">
+      <div class="panel">
+        <h2>AI-Assisted Forensic Analysis</h2>
+        <p class="muted">Select evidence artefacts and ask the local model to identify observations,
+          suspicious patterns, contradictions, and hypotheses. The model never makes a final attribution
+          decision.</p>
+        <div id="analysis-evidence-select" class="checkbox-grid"></div>
+        <div class="row gap">
+          <button id="btn-analyse-selected" class="btn btn-primary">Analyse Selected Evidence</button>
+          <span id="analysis-status" class="muted"></span>
+        </div>
+        <div id="analysis-results" class="analysis-results"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header-row">
+          <h2>Findings Board</h2>
+        </div>
+        <div id="suggested-findings" class="suggested-findings"></div>
+        <form id="finding-form" class="finding-form">
+          <h3>New Finding</h3>
+          <div class="form-grid">
+            <label>Title<input type="text" id="f-title" maxlength="200" required></label>
+            <label>Category
+              <select id="f-category"></select>
+            </label>
+            <label>Severity
+              <select id="f-severity">
+                <option>Informational</option><option>Low</option><option>Medium</option>
+                <option>High</option><option>Critical</option>
+              </select>
+            </label>
+            <label>Confidence
+              <select id="f-confidence">
+                <option>Low</option><option>Medium</option><option>High</option>
+              </select>
+            </label>
+          </div>
+          <label>Evidence References
+            <div id="f-evidence-refs" class="checkbox-grid compact"></div>
+          </label>
+          <label>Observation (what the evidence directly shows)
+            <textarea id="f-observation" maxlength="2000" required></textarea>
+          </label>
+          <label>Interpretation (what the examiner believes it may mean)
+            <textarea id="f-interpretation" maxlength="2000" required></textarea>
+          </label>
+          <label>Investigator Notes (optional)
+            <textarea id="f-notes" maxlength="4000"></textarea>
+          </label>
+          <button type="submit" class="btn btn-primary">Add Finding</button>
+        </form>
+        <div id="findings-list" class="findings-list"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Root Cause Analysis</h2>
+        <p class="muted">What caused the incident? Select the classification best supported by the
+          correlated evidence.</p>
+        <div id="root-cause-options" class="root-cause-options"></div>
+        <div class="form-grid">
+          <label>Primary cause<input type="text" id="rc-primary" maxlength="300"></label>
+          <label>Contributing causes (comma-separated)<input type="text" id="rc-contributing" maxlength="500"></label>
+        </div>
+        <label>Justification
+          <textarea id="rc-justification" maxlength="2000"></textarea>
+        </label>
+        <button id="btn-save-root-cause" class="btn btn-primary">Save Root Cause Classification</button>
+        <div id="root-cause-saved" class="muted"></div>
+      </div>
+    </section>
+
+    <!-- STAGE 6: FORENSIC REPORT -->
+    <section class="stage hidden" id="stage-report" data-stage-panel="report">
+      <div class="panel">
+        <h2>Forensic Report Generator</h2>
+        <div class="callout callout-warning">
+          <strong>Draft generated with AI assistance — Investigator review required.</strong>
+          This report is not a legal or disciplinary conclusion.
+        </div>
+        <div class="row gap">
+          <button id="btn-generate-report" class="btn btn-primary">Generate Report Preview</button>
+          <button id="btn-export-md" class="btn btn-outline" disabled>Export Markdown</button>
+          <button id="btn-export-html" class="btn btn-outline" disabled>Export HTML</button>
+        </div>
+        <div id="report-preview" class="report-preview"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Evidence Inspector Modal -->
+  <div id="evidence-modal" class="modal hidden">
+    <div class="modal-backdrop" id="evidence-modal-backdrop"></div>
+    <div class="modal-panel">
+      <button class="modal-close" id="evidence-modal-close">&times;</button>
+      <div id="evidence-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Guided Investigation Overlay -->
+  <div id="guided-overlay" class="guided-overlay hidden">
+    <div class="guided-card">
+      <div class="guided-step-label">Step <span id="guided-step-num"></span> of 5</div>
+      <h2 id="guided-step-title"></h2>
+      <p class="guided-question" id="guided-step-question"></p>
+      <div id="guided-reveal" class="guided-reveal hidden"></div>
+      <div class="row gap guided-actions">
+        <button id="guided-prev" class="btn btn-outline">Back</button>
+        <button id="guided-next" class="btn btn-primary">Next</button>
+        <button id="guided-exit" class="btn btn-outline">Exit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Final screen -->
+  <div id="final-overlay" class="guided-overlay hidden">
+    <div class="guided-card final-card">
+      <h1>AI systems create new forms of digital evidence.</h1>
+      <p class="final-lead">If we cannot reconstruct what the AI saw, what it was told, what it retrieved
+        and what it did, we may not be able to explain its behaviour.</p>
+      <h2 class="final-principle">Preserve. Reconstruct. Correlate. Verify.</h2>
+      <p class="final-sub">AI assists the forensic examiner. The forensic conclusion remains human.</p>
+      <button id="final-close" class="btn btn-primary">Close</button>
+    </div>
+  </div>
+
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}
