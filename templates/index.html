@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block title %}AI Forensics Lab — {{ case.case_id }}{% endblock %}
+{% block body %}
+<div id="app" data-csrf="{{ csrf_token }}">
+
+  <div class="sim-banner">Educational simulation — fictional evidence only</div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <div>
+        <h1>AI Forensics Lab</h1>
+        <p class="subtitle">
+          <span id="subtitle-en">{{ config.SUBTITLE_EN }}</span>
+          <span id="subtitle-es" hidden>{{ config.SUBTITLE_ES }}</span>
+        </p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="btn-lang" class="btn btn-outline secondary-control" data-lang="en">Español</button>
+      <button id="btn-presentation" class="btn btn-outline secondary-control">Presentation Mode</button>
+      <span id="ollama-indicator" class="status-pill status-unknown secondary-control" title="Ollama connection status">Ollama: checking…</span>
+    </div>
+  </header>
+
+  <nav class="progress-track" id="progress-track">
+    <button class="progress-step active" data-stage="case"><span class="progress-num">1</span>Case</button>
+    <span class="progress-arrow">→</span>
+    <button class="progress-step" data-stage="evidence" disabled><span class="progress-num">2</span>Evidence</button>
+    <span class="progress-arrow">→</span>
+    <button class="progress-step" data-stage="principles" disabled><span class="progress-num">3</span>Principles</button>
+    <span class="progress-arrow">→</span>
+    <button class="progress-step" data-stage="findings" disabled><span class="progress-num">4</span>Findings</button>
+    <span class="progress-arrow">→</span>
+    <button class="progress-step" data-stage="conclusion" disabled><span class="progress-num">5</span>Conclusion</button>
+  </nav>
+
+  <main id="stage-container">
+
+    <!-- STAGE 1: CASE -->
+    <section class="stage" id="stage-case" data-stage-panel="case">
+      <div class="panel panel-lead">
+        <span class="case-tag">Case {{ case.case_id }} — {{ case.codename }}</span>
+        <p>{{ incident_summary.intro }}</p>
+        <p>{{ incident_summary.narrative }}</p>
+
+        <div class="callout callout-ai">
+          <div class="callout-label">AI-Generated Conclusion (under examination)</div>
+          <blockquote>&ldquo;{{ incident_summary.ai_conclusion }}&rdquo;</blockquote>
+        </div>
+
+        <p>{{ incident_summary.trigger }}</p>
+
+        <div class="callout callout-objective">
+          <div class="callout-label">The examiner is asked to determine</div>
+          <p>{{ incident_summary.objective_intro }}</p>
+          <ul>
+            {% for q in incident_summary.objective_questions %}
+            <li>{{ q }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <button id="btn-start-assessment" class="btn btn-primary btn-large">Start Assessment</button>
+      </div>
+    </section>
+
+    <!-- STAGE 2: EVIDENCE -->
+    <section class="stage hidden" id="stage-evidence" data-stage-panel="evidence">
+      <div class="panel">
+        <h2>Evidence</h2>
+        <p class="muted">Five artefacts were collected for this investigation. Inspect each one, and
+          mark it relevant or suspicious as you form your own view.</p>
+
+        <div class="evidence-grid">
+          {% for e in evidence %}
+          <article class="evidence-card" data-evidence-id="{{ e.id }}">
+            <button class="evidence-card-toggle" data-toggle-evidence="{{ e.id }}">
+              <span class="evidence-number">{{ e.number }}</span>
+              <span class="evidence-title-group">
+                <span class="evidence-title">{{ e.title }}</span>
+                <span class="evidence-type-badge">{{ e.type }}</span>
+              </span>
+              <span class="evidence-badges">
+                {% if e.flagged %}<span class="badge badge-flagged" data-badge-flagged>Flagged</span>{% endif %}
+                {% if e.relevant %}<span class="badge badge-relevant" data-badge-relevant>Relevant</span>{% endif %}
+              </span>
+              <span class="evidence-chevron">›</span>
+            </button>
+
+            <div class="evidence-card-body" id="evidence-body-{{ e.id }}" hidden>
+              <span class="origin-flag origin-original">Original Evidence</span>
+
+              {% if e.id == "EV4" %}
+                <div class="evidence-raw evidence-doc" id="doc-{{ e.id }}">{{ e.content_before }}<span class="injected-block" id="injected-{{ e.id }}">{{ e.injected_block }}</span>{{ e.content_after }}</div>
+                <button class="btn btn-outline btn-small" id="btn-inspect-document" data-evidence-id="{{ e.id }}">Inspect document</button>
+                <div class="reveal-panel hidden" id="injection-reveal-{{ e.id }}">
+                  <div class="reveal-title">Potential AI manipulation detected</div>
+                  <p>{{ e.injection_explanation }}</p>
+                  <div class="injection-term-box">
+                    <strong>{{ e.injection_term }}</strong>
+                    <p>{{ e.injection_definition }}</p>
+                  </div>
+                </div>
+              {% elif e.id == "EV5" %}
+                <blockquote class="ai-output-quote">&ldquo;{{ e.content }}&rdquo;</blockquote>
+                <div class="confidence-row">Confidence expressed by AI:
+                  <span class="badge-confidence">{{ e.ai_confidence }}</span>
+                </div>
+                <p class="muted">{{ e.confidence_caution }}</p>
+              {% else %}
+                <div class="evidence-raw">{{ e.content }}</div>
+                {% if e.status %}<div class="status-chip">{{ e.status }}</div>{% endif %}
+              {% endif %}
+
+              <div class="evidence-actions">
+                <button class="btn btn-outline btn-small" data-action="relevant" data-evidence-id="{{ e.id }}">
+                  {{ "Unmark Relevant" if e.relevant else "Mark Relevant" }}
+                </button>
+                <button class="btn btn-outline btn-small" data-action="flag" data-evidence-id="{{ e.id }}">
+                  {{ "Unflag Suspicious" if e.flagged else "Flag Suspicious" }}
+                </button>
+              </div>
+
+              <div class="evidence-notes">
+                <span class="origin-flag origin-notes">Investigator Notes</span>
+                <div class="note-list" id="notes-{{ e.id }}">
+                  {% for n in e.notes %}
+                  <div class="note-item">{{ n.note_text }}</div>
+                  {% else %}
+                  <span class="muted" data-no-notes>No notes yet.</span>
+                  {% endfor %}
+                </div>
+                <textarea id="note-input-{{ e.id }}" maxlength="4000" placeholder="Add a short investigator note (does not modify original evidence)…"></textarea>
+                <button class="btn btn-primary btn-small" data-action="add-note" data-evidence-id="{{ e.id }}">Add Note</button>
+              </div>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+
+        <div class="callout callout-principle">{{ core_messages[0] }}</div>
+        <button class="btn btn-primary btn-large" data-continue="principles">Continue to Principles</button>
+      </div>
+    </section>
+
+    <!-- STAGE 3: PRINCIPLES -->
+    <section class="stage hidden" id="stage-principles" data-stage-panel="principles">
+      <div class="panel">
+        <h2>Responsible AI Assessment</h2>
+        <p class="muted">Evaluate the incident using the CEPEJ principles.</p>
+        <p class="unesco-relationship">{{ unesco_relationship }}</p>
+
+        <div class="row gap">
+          <button id="btn-audience-mode" class="btn btn-outline">Audience Mode: Off</button>
+        </div>
+
+        <div class="principle-list">
+          {% for p in principles %}
+          <div class="principle-card" data-principle-id="{{ p.id }}">
+            <div class="principle-head">
+              <span class="principle-number">{{ p.number }}</span>
+              <h3>{{ p.title }}</h3>
+            </div>
+            <p class="principle-question">{{ p.question }}</p>
+
+            <div class="audience-picker hidden">
+              <p class="audience-prompt">What would you choose?</p>
+              <div class="audience-options">
+                <button class="btn btn-outline audience-choice" data-choice="green">🟢 Acceptable</button>
+                <button class="btn btn-outline audience-choice" data-choice="yellow">🟡 Requires review</button>
+                <button class="btn btn-outline audience-choice" data-choice="red">🔴 Significant concern</button>
+              </div>
+            </div>
+
+            <div class="principle-result">
+              <div class="recommended-label hidden">Recommended assessment</div>
+              <span class="status-pill status-pill-{{ p.status }}">{{ status_emoji[p.status] }} {{ p.status_label }}</span>
+              <p>{{ p.explanation }}</p>
+              {% if p.evidence_note %}<p class="muted">{{ p.evidence_note }}</p>{% endif %}
+              {% if p.highlight %}<div class="callout callout-highlight">{{ p.highlight }}</div>{% endif %}
+              {% if p.unesco_refs %}
+              <div class="unesco-refs">
+                {% for key in p.unesco_refs %}
+                <span class="unesco-chip" title="{{ unesco_concepts[key].description }}">{{ unesco_concepts[key].label }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="callout callout-principle">{{ core_messages[1] }} {{ core_messages[2] }}</div>
+        <button class="btn btn-primary btn-large" data-continue="findings">Continue to Findings</button>
+      </div>
+    </section>
+
+    <!-- STAGE 4: FINDINGS -->
+    <section class="stage hidden" id="stage-findings" data-stage-panel="findings">
+      <div class="panel">
+        <h2>Key Findings</h2>
+        <div class="finding-list">
+          {% for f in findings %}
+          <div class="finding-card finding-{{ f.color }}">
+            <div class="finding-head">
+              <h3>Finding {{ loop.index }}</h3>
+              <span class="status-pill status-pill-{{ f.color }}">{{ status_emoji[f.color] }} {{ f.severity }}</span>
+            </div>
+            <div class="finding-title">{{ f.title }}</div>
+            {% if f.evidence_refs %}
+            <div class="muted">Evidence: {{ f.evidence_refs | join(", ") }}</div>
+            {% endif %}
+            <p>{{ f.explanation }}</p>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="callout callout-principle">{{ core_messages[3] }}</div>
+
+        <div class="ai-analysis-block">
+          <h3>AI-assisted analysis</h3>
+          <p class="muted">The application can ask the local model to review the case evidence
+            against the CEPEJ principles. It never makes a final forensic or legal conclusion.</p>
+          <button id="btn-analyse" class="btn btn-primary btn-large">Analyse Evidence with AI</button>
+          <span id="analysis-status" class="muted"></span>
+          <div id="analysis-results" class="analysis-results"></div>
+        </div>
+
+        <button class="btn btn-primary btn-large" data-continue="conclusion">Continue to Conclusion</button>
+      </div>
+    </section>
+
+    <!-- STAGE 5: CONCLUSION -->
+    <section class="stage hidden" id="stage-conclusion" data-stage-panel="conclusion">
+      <div class="panel">
+        <h2>AI Ethics &amp; Forensic Assessment</h2>
+
+        <div class="principle-chip-row">
+          {% for p in principles %}
+          <span class="status-pill status-pill-{{ p.status }}">{{ status_emoji[p.status] }} {{ p.title }}</span>
+          {% endfor %}
+        </div>
+
+        <div class="overall-assessment overall-red">
+          <div class="overall-label">Overall Assessment</div>
+          <div class="overall-value">{{ final_assessment.overall }}</div>
+        </div>
+
+        <h3>Primary issue</h3>
+        <p class="primary-issue">{{ final_assessment.primary_issue }}</p>
+
+        <h3>Contributing factors</h3>
+        <ul>
+          {% for c in final_assessment.contributing_factors %}
+          <li>{{ c }}</li>
+          {% endfor %}
+        </ul>
+
+        <h3>Recommended controls</h3>
+        <ul>
+          {% for c in final_assessment.recommended_controls %}
+          <li>{{ c }}</li>
+          {% endfor %}
+        </ul>
+
+        <div class="callout callout-warning">
+          <p class="final-question">{{ final_assessment.final_question }}</p>
+          <p><strong>{{ final_assessment.auditability_statement }}</strong></p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header-row">
+          <h2>AI Evidence Model</h2>
+          <button id="btn-show-forensic-evidence" class="btn btn-outline">Show forensic evidence</button>
+        </div>
+        <div class="evidence-model evidence-model-simple" id="evidence-model-simple">
+          {% for layer in evidence_model_simple %}
+          <div class="model-box">{{ layer }}</div>
+          {% if not loop.last %}<div class="model-arrow">↓</div>{% endif %}
+          {% endfor %}
+        </div>
+        <div class="evidence-model evidence-model-expanded hidden" id="evidence-model-expanded">
+          {% for layer in evidence_model_expanded %}
+          <div class="model-box-group">
+            <div class="model-box">{{ layer.layer }}</div>
+            <ul class="model-box-items">
+              {% for item in layer.elements %}<li>{{ item }}</li>{% endfor %}
+            </ul>
+          </div>
+          {% if not loop.last %}<div class="model-arrow">↓</div>{% endif %}
+          {% endfor %}
+        </div>
+        <p class="muted">Each layer may contain evidence needed to reconstruct an AI-assisted incident.</p>
+      </div>
+
+      <div class="panel">
+        <details class="tech-details">
+          <summary>Technical Details</summary>
+          <div class="tech-details-body">
+            <h4>System prompt used for AI-assisted analysis</h4>
+            <pre class="evidence-raw">{{ system_prompt }}</pre>
+            <h4>Model configuration</h4>
+            <p>Model: {{ config.OLLAMA_MODEL }} · Temperature: {{ config.OLLAMA_TEMPERATURE }}</p>
+            <h4>Evidence integrity</h4>
+            <table class="forensic-table">
+              <thead><tr><th>ID</th><th>Timestamp</th><th>SHA-256</th></tr></thead>
+              <tbody>
+                {% for e in evidence %}
+                <tr><td>{{ e.id }}</td><td>{{ e.timestamp }}</td><td><code>{{ e.sha256[:24] }}…</code></td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+
+      <div class="panel">
+        <button id="btn-restart" class="btn btn-outline btn-large">Restart Demo</button>
+      </div>
+
+      <div class="panel final-panel">
+        <h1>AI systems create new forms of digital evidence.</h1>
+        <p class="final-lead">To evaluate their behaviour, we need to understand not only the final
+          output, but also the prompts, context, retrieved information, model configuration and
+          human decisions that shaped it.</p>
+        <h2 class="final-principle">Preserve. Understand. Verify.</h2>
+        <p class="final-sub">AI assists the examiner. Humans remain accountable for the conclusion.</p>
+      </div>
+    </section>
+
+  </main>
+
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}

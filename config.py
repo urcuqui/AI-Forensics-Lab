@@ -13,5 +13,7 @@ DATABASE_PATH = os.path.join(BASE_DIR, "data", "forensics_lab.sqlite3")
 
 MAX_CONTENT_LENGTH = 256 * 1024  # 256 KB request body cap
 
-MAX_EVIDENCE_SELECTION = 6
 MAX_NOTE_LENGTH = 4000
+
+SUBTITLE_EN = "Ethical and forensic assessment of AI systems"
+SUBTITLE_ES = "Evaluación ética y forense de sistemas de inteligencia artificial"
