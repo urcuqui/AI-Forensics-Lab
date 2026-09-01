@@ -6,6 +6,7 @@ is investigator-created annotation, kept in a separate table set so the two
 are never confused.
 """
 import json
+import os
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -24,6 +25,7 @@ VALID_CATEGORIES = {
 
 @contextmanager
 def _conn():
+    os.makedirs(os.path.dirname(config.DATABASE_PATH), exist_ok=True)
     conn = sqlite3.connect(config.DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     try:
